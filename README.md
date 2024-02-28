@@ -16,3 +16,4 @@ options:\
 &ensp;-c, --clean           remove all compiled objects and executables\
 &ensp;-C, --command         remake compile_commands.json database\
 &ensp;-I, --install         install executable into location from KMakeFile\
+
