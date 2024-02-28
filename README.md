@@ -1,7 +1,7 @@
 # kmake2
 CLI tool for compiling and building C projects
 
-Executables can be found in the *<os>-dist* branch in the *dist* folder
+Executables can be found in the *[os]-dist* branch in the *dist* folder
 
 Successor to the original *kmake* https://github.com/Koholify/Kmake
 
