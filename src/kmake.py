@@ -233,14 +233,14 @@ def compile():
                 print(f"Error Compiling {s_file}")
                 errors = True
 
-        if not errors:
-            target = get_target_name(cfg)
-            exe_path = path.join(cfg.d_build, target)
-            command = f"{cfg.cc} {' '.join(target_objs)} -o {exe_path} {cfg.lflags}"
-            print(command)
-            res = os.system(command)
-            if not res == 0:
-                print(f"Error linking {cfg.name}")
+    if not errors:
+        target = get_target_name(cfg)
+        exe_path = path.join(cfg.d_build, target)
+        command = f"{cfg.cc} {' '.join(target_objs)} -o {exe_path} {cfg.lflags}"
+        print(command)
+        res = os.system(command)
+        if not res == 0:
+            print(f"Error linking {cfg.name}")
 
     if cfg.compile_commands:
         compile_commands()
