@@ -108,7 +108,10 @@ def get_target_name(cfg: Config) -> str:
 
 def get_exe_path(cfg: Config) -> str:
     target = get_target_name(cfg)
-    return path.join(cfg.d_build, target)
+    exe_path = path.join(cfg.d_build, target)
+    if sys.platform == "win32":
+        exe_path = exe_path.replace("/", "\\")
+    return exe_path
 
 def fill_config() -> Config:
     try:
@@ -187,6 +190,7 @@ def compile_commands():
 def run_exe():
     cfg = fill_config()
     exe_path = get_exe_path(cfg)
+    print(exe_path)
     res = os.system(exe_path)
     print(f"Exit Code: {res}")
 
