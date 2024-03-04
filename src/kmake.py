@@ -187,6 +187,7 @@ def compile_commands():
 def run_exe():
     cfg = fill_config()
     exe_path = get_exe_path(cfg)
+    print(exe_path)
     res = os.system(exe_path)
     print(f"Exit Code: {res}")
 
