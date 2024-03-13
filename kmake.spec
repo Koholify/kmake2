@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src\\kmake.py'],
+    ['src/kmake.py'],
     pathex=[],
     binaries=[],
     datas=[],
