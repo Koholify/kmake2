@@ -7,6 +7,7 @@ import shutil
 import sys
 
 CONFIG_FILE_NAME = "KMakeFile.txt"
+VERSION_NUMBER = "1.0.0"
 
 class Config:
     def __init__(self) -> None:
@@ -20,6 +21,7 @@ class Config:
         self.lflags = ""
         self.includes = ""
         self.type = ""
+        self.extension = ""
         self.compile_commands = False
 
     def __repr__(self) -> str:
@@ -35,6 +37,7 @@ class Config:
         d["includes"] = self.includes
         d["type"] = self.type
         d["compile_commands"] = self.compile_commands
+        d["extension"] = self.extension
         return f"(Config){str(d)}"
 
     def fill(self, path="KMakeFile.txt"):
@@ -46,6 +49,7 @@ class Config:
                 if len(p) < 2: continue
                 filevars[p[0]] = p[1]
 
+        self.extension = filevars["EXT"]
         self.d_parent = filevars["DIR"]
         self.cc = filevars["CC"]
         self.d_src = filevars["SRC"]
@@ -66,6 +70,7 @@ SRC=src/
 BUILD=.build/
 
 PROJECTNAME=_NAME_
+EXT=.c
 TYPE=exe
 CFLAGS=-std=c17 -Werror -Wall -pedantic
 LFLAGS=
@@ -207,7 +212,7 @@ def compile():
     cfg = fill_config()
     source_path = cfg.d_src
     files = os.listdir(source_path)
-    source_files = list(filter(lambda f: f.endswith(".c"), files))
+    source_files = list(filter(lambda f: f.endswith(cfg.extension), files))
     header_files = list(map(lambda f: path.join(source_path, f), filter(lambda f: f.endswith(".h"), files)))
     target_objs = list(map(lambda f: path.join(cfg.d_build, "obj", (f + ".o")), source_files))
 
@@ -252,6 +257,8 @@ def compile():
 
 def run():
     parser = ArgumentParser(description=f"Compile project with {CONFIG_FILE_NAME}")
+    parser.add_argument("--version", action="store_true",
+                        help="print version number")
     parser.add_argument("-r", "--run", action="store_true",
                         help="run compiled program")
     parser.add_argument("-i", "--init", action="store_true",
@@ -267,7 +274,9 @@ def run():
                         help="overwrite existing KMakeFile during initialization")
     args = parser.parse_args()
 
-    if args.run:
+    if args.version:
+        print(f"KMake2 version {VERSION_NUMBER}")
+    elif args.run:
         run_exe()
     elif args.init:
         init_dir(args.name, args.override)
