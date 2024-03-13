@@ -1,3 +1,5 @@
 kmake-venv
-build
+kmake.spec
 dist
+build
+
