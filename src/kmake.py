@@ -182,7 +182,7 @@ def compile_commands():
         files = os.listdir(cfg.d_src)
         for (i, file) in enumerate(files):
             command = create_compile_command(cfg, file)
-            entry = commandTemplate.format(d_parent=cfg.d_parent, cmd=command, file=file)
+            entry = commandTemplate.format(d_parent=cfg.d_parent, cmd=command, file=path.join(cfg.d_src, file))
             cFile.write(entry)
 
             if i < len(files) - 1:
