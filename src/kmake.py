@@ -8,7 +8,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 CONFIG_FILE_NAME = "KMakeFile.txt"
-VERSION_NUMBER = "1.0.0"
+VERSION_NUMBER = "1.0.1"
 
 class Config:
     def __init__(self) -> None:
@@ -247,12 +247,16 @@ def compile():
     if len(header_files) > 0:
         header_mtime = max(list(map(lambda f: path.getmtime(f), header_files)))
 
-    errors = False
+    future_results = {}
     with ThreadPoolExecutor() as executor:
         future_results = {executor.submit(compileFile, src, cfg, header_mtime): src for src in source_files}
-        print(future_results)
+        executor.shutdown()
 
-    if not errors:
+    results: dict[str, bool]
+    results = dict(map(lambda x: (future_results[x], x.result()), future_results))
+    failures = list(filter(lambda r: not results[r], results))
+
+    if len(failures) == 0:
         target = get_target_name(cfg)
         exe_path = path.join(cfg.d_build, target)
         command = f"{cfg.cc} {' '.join(target_objs)} -o {exe_path} {cfg.lflags}"
@@ -260,6 +264,15 @@ def compile():
         res = os.system(command)
         if not res == 0:
             print(f"Error linking {cfg.name}")
+    else:
+        print("="*30)
+        print("Linking aborted")
+        print("Compile stage ended with errors")
+        print("="*30)
+        print("Files which failed:\n")
+        for f in failures:
+            print("\t" + f)
+        print("="*30)
 
     if cfg.compile_commands:
         compile_commands()
