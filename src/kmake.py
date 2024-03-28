@@ -209,24 +209,27 @@ def install_exe():
     except PermissionError:
         print(f"PermissionError: install failed: '{install_path}'")
 
-def compileFile(s_file, o_file, source_path) -> bool:
-        s_mtime = path.getmtime(path.join(source_path, s_file))
-        o_mtime = 0.0
+def compileFile(s_file: str, cfg: Config, header_mtime: float) -> bool:
+    source_path = cfg.d_src
+    o_file = path.join(cfg.d_build, "obj", s_file + ".o")
 
-        try:
-            o_mtime = path.getmtime(o_file)
-        except FileNotFoundError:
-            pass
+    s_mtime = path.getmtime(path.join(source_path, s_file))
+    o_mtime = 0.0
 
-        if s_mtime > o_mtime or header_mtime > o_mtime:
-            command = create_compile_command(cfg, s_file)
-            print(command)
-            res = os.system(command)
-            if not res == 0:
-                print(f"Error Compiling {s_file}")
-                return False
+    try:
+        o_mtime = path.getmtime(o_file)
+    except FileNotFoundError:
+        pass
 
-        return True
+    if s_mtime > o_mtime or header_mtime > o_mtime:
+        command = create_compile_command(cfg, s_file)
+        print(command)
+        res = os.system(command)
+        if not res == 0:
+            print(f"Error Compiling {s_file}")
+            return False
+
+    return True
 
 def compile():
     cfg = fill_config()
@@ -245,9 +248,9 @@ def compile():
         header_mtime = max(list(map(lambda f: path.getmtime(f), header_files)))
 
     errors = False
-    threading.RLock
-    for (s_file, o_file) in zip(source_files, target_objs):
-        pass
+    with ThreadPoolExecutor() as executor:
+        future_results = {executor.submit(compileFile, src, cfg, header_mtime): src for src in source_files}
+        print(future_results)
 
     if not errors:
         target = get_target_name(cfg)
