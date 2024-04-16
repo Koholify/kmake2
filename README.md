@@ -19,11 +19,11 @@ options:\
 
 Installation instructions:\
 Debian/Ubuntu - .deb package is provided for quick install\
-&ensp;git clone https://github.com/Koholify/Kmake2.git && sudo dpkg -i ./Kmake2/kmake-1.0.deb\
+&ensp;git clone https://github.com/Koholify/Kmake2.git && sudo dpkg -i ./Kmake2/kmake-1.0.deb
 
 other - build and install kmake into an executable with pyinstaller\
 &ensp;requirements - pyinstaller, recommended to create python-venv and install with `pip install pyinstaller`\
 &ensp;windows - `./build.bat && ./install.bat [install location]`\
 &ensp;&ensp;(default location: dest=%homepath%\tools\bin)\
 &ensp;*nix and macos - `./build.sh && sudo ./install.sh`\
-&ensp;&ensp;(installs to /usr/local/bin)\
+&ensp;&ensp;(installs to /usr/local/bin)
