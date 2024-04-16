@@ -249,11 +249,9 @@ def compile():
 
     future_results = {}
     with ThreadPoolExecutor() as executor:
-        future_results = {executor.submit(compileFile, src, cfg, header_mtime): src for src in source_files}
-        executor.shutdown()
+        future_results = {src : executor.submit(compileFile, src, cfg, header_mtime) for src in source_files}
 
-    results: dict[str, bool]
-    results = dict(map(lambda x: (future_results[x], x.result()), future_results))
+    results = { x : future_results[x].result() for x in future_results }
     failures = list(filter(lambda r: not results[r], results))
 
     if len(failures) == 0:
