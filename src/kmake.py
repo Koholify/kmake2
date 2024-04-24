@@ -8,7 +8,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 CONFIG_FILE_NAME = "KMakeFile.txt"
-VERSION_NUMBER = "1.0.1"
+VERSION_NUMBER = "1.0.2"
 
 class Config:
     def __init__(self) -> None:
@@ -23,7 +23,9 @@ class Config:
         self.includes = ""
         self.type = ""
         self.extension = ""
+        self.ar = ""
         self.compile_commands = False
+        self.sub_dirs : list[str] = []
 
     def __repr__(self) -> str:
         d = dict()
@@ -39,10 +41,29 @@ class Config:
         d["type"] = self.type
         d["compile_commands"] = self.compile_commands
         d["extension"] = self.extension
+        d["sub_dirs"] = self.sub_dirs
+        d["ar"] = self.ar
         return f"(Config){str(d)}"
 
     def fill(self, path="KMakeFile.txt"):
-        filevars = {}
+        filevars : dict[str, str] = {
+            "VERSION": "",
+            "EXT": "",
+            "DIR": "",
+            "CC": "",
+            "SRC": "",
+            "BUILD": "",
+            "PROJECTNAME": "",
+            "TYPE": "",
+            "CFLAGS": "",
+            "LFLAGS": "",
+            "INCLUDES": "",
+            "INSTALL_LOC": "",
+            "COMPILE_COMMANDS": "0",
+            "SUBDIRS": "",
+            "AR": "",
+        }
+
         with open(path, "r") as file:
             for line in file.readlines():
                 line = line.strip()
@@ -50,6 +71,7 @@ class Config:
                 if len(p) < 2: continue
                 filevars[p[0]] = p[1]
 
+        self.version = filevars["VERSION"]
         self.extension = filevars["EXT"]
         self.d_parent = filevars["DIR"]
         self.cc = filevars["CC"]
@@ -62,10 +84,13 @@ class Config:
         self.includes = filevars["INCLUDES"]
         self.d_install = filevars["INSTALL_LOC"]
         self.compile_commands = not filevars["COMPILE_COMMANDS"] == '0'
+        self.sub_dirs = [] if filevars["SUBDIRS"] == '' else filevars["SUBDIRS"].split(" ")
+        self.ar = filevars["AR"]
 
         return self
 
-makeTemplate = """
+makeTemplate = """\
+VERSION=_Version_
 CC=clang
 SRC=src/
 BUILD=.build/
@@ -77,17 +102,20 @@ CFLAGS=-std=c17 -Werror -Wall -pedantic
 LFLAGS=
 INCLUDES=
 
+SUBDIRS=
+
+AR=ar
 INSTALL_LOC=/usr/local/bin/
-COMPILE_COMMANDS=0
+COMPILE_COMMANDS=1
 """
 
-gitignoreTemplate = """
+gitignoreTemplate = """\
 .build
 .vs
 .vscode
 """
 
-helloWorldTemplate = """
+helloWorldTemplate = """\
 #include <stdio.h>
 
 int main(int argc, char** argv) {
@@ -109,7 +137,7 @@ def get_target_name(cfg: Config) -> str:
         if sys.platform == "win32":
             target = target + ".lib"
         else:
-            target = target + ".a"
+            target = "lib" + target + ".a"
     return target
 
 def get_exe_path(cfg: Config) -> str:
@@ -142,6 +170,7 @@ def init_dir(name="app", override=False):
         print(f"Creating: {CONFIG_FILE_NAME}")
         with open(CONFIG_FILE_NAME, mode="w") as file:
             template = makeTemplate.replace("_NAME_", name)
+            template = template.replace("_Version_", VERSION_NUMBER)
             file.write("DIR=" + cwd + "/\n")
             file.write(template)
 
@@ -157,8 +186,18 @@ def init_dir(name="app", override=False):
             file.write(helloWorldTemplate)
 
 
-def clean_dir():
+def clean_dir(all=False):
     cfg = fill_config()
+
+    if all:
+        for dir in cfg.sub_dirs:
+            try:
+                os.chdir(path.join(cfg.d_parent, dir))
+                clean_dir(True)
+            except FileNotFoundError:
+                print(f"KmakeFile.txt not found in subdirectory: {dir}")
+        os.chdir(cfg.d_parent)
+
     obj_path = path.join(cfg.d_build, "obj")
     obj_files = os.listdir(obj_path)
     for file in obj_files:
@@ -171,6 +210,8 @@ def clean_dir():
     except FileNotFoundError:
         print(f"unable to find {exe_path} to remove")
 
+    print(f"Cleaned {cfg.name}")
+
 commandTemplate = """{{
   "directory": "{d_parent}",
   "command": "{cmd}",
@@ -178,6 +219,17 @@ commandTemplate = """{{
 }}"""
 def compile_commands():
     cfg = fill_config()
+
+    for dir in cfg.sub_dirs:
+        try:
+            os.chdir(path.join(cfg.d_parent, dir))
+            tc = fill_config()
+            cfg.includes = " ".join([cfg.includes, tc.includes, "-I"+path.join(dir, tc.d_src)])
+        except FileNotFoundError:
+            print(f"KmakeFile.txt not found in subdirectory: {dir}")
+
+    os.chdir(cfg.d_parent)
+
     with open("compile_commands.json", mode="w") as cFile:
         cFile.write("[\n")
         files = os.listdir(cfg.d_src)
@@ -209,7 +261,7 @@ def install_exe():
     except PermissionError:
         print(f"PermissionError: install failed: '{install_path}'")
 
-def compileFile(s_file: str, cfg: Config, header_mtime: float) -> bool:
+def compileFile(s_file: str, cfg: Config, header_mtime: float) -> bool | None:
     source_path = cfg.d_src
     o_file = path.join(cfg.d_build, "obj", s_file + ".o")
 
@@ -228,11 +280,25 @@ def compileFile(s_file: str, cfg: Config, header_mtime: float) -> bool:
         if not res == 0:
             print(f"Error Compiling {s_file}")
             return False
+        return True
 
-    return True
+    return None
 
-def compile():
+def compile() -> bool:
     cfg = fill_config()
+    forced = False
+
+    for dir in cfg.sub_dirs:
+        os.chdir(path.join(cfg.d_parent, dir))
+        forced = compile() or forced
+        tc = fill_config()
+        cfg.includes = " ".join([cfg.includes, tc.includes, "-I"+path.join(dir, tc.d_src)])
+        cfg.lflags = " ".join([cfg.lflags, tc.lflags])
+        if tc.type == "static":
+            cfg.lflags += f"-L{path.join(dir, tc.d_build)} -l{tc.name}"
+
+    os.chdir(cfg.d_parent)
+
     source_path = cfg.d_src
     files = os.listdir(source_path)
     source_files = list(filter(lambda f: f.endswith(cfg.extension), files))
@@ -252,29 +318,43 @@ def compile():
         future_results = {src : executor.submit(compileFile, src, cfg, header_mtime) for src in source_files}
 
     results = { x : future_results[x].result() for x in future_results }
-    failures = list(filter(lambda r: not results[r], results))
+    comps = sum(map(lambda r: 0 if results[r] is None else 1, results))
+    failures = list(filter(lambda r: not results[r] and results[r] is not None, results))
 
-    if len(failures) == 0:
-        target = get_target_name(cfg)
-        exe_path = path.join(cfg.d_build, target)
-        command = f"{cfg.cc} {' '.join(target_objs)} -o {exe_path} {cfg.lflags}"
-        print(command)
-        res = os.system(command)
-        if not res == 0:
-            print(f"Error linking {cfg.name}")
+    if comps > 0 or forced:
+        if len(failures) == 0:
+            target = get_target_name(cfg)
+            if cfg.type == "exe":
+                exe_path = path.join(cfg.d_build, target)
+                command = f"{cfg.cc} {' '.join(target_objs)} -o {exe_path} {cfg.lflags}"
+                print(command)
+                res = os.system(command)
+                if not res == 0:
+                    print(f"Error linking {cfg.name}")
+            elif cfg.type == "static":
+                exe_path = path.join(cfg.d_build, target)
+                command = f"{cfg.ar} rcs {exe_path} {' '.join(target_objs)}"
+                print(command)
+                res = os.system(command)
+                if not res == 0:
+                    print(f"Error creating archive {cfg.name}")
+
+        else:
+            print("="*30)
+            print("Linking aborted")
+            print("Compile stage ended with errors")
+            print("="*30)
+            print("Files which failed:\n")
+            for f in failures:
+                print("\t" + f)
+            print("="*30)
     else:
-        print("="*30)
-        print("Linking aborted")
-        print("Compile stage ended with errors")
-        print("="*30)
-        print("Files which failed:\n")
-        for f in failures:
-            print("\t" + f)
-        print("="*30)
+        print(f"No changes made for {cfg.name}")
 
     if cfg.compile_commands:
         compile_commands()
 
+    return comps > 0 or forced
 
 def run():
     parser = ArgumentParser(description=f"Compile project with {CONFIG_FILE_NAME}")
@@ -286,6 +366,8 @@ def run():
                         help="create initial directory structure")
     parser.add_argument("-c", "--clean", action="store_true",
                         help="remove all compiled objects and executables")
+    parser.add_argument("-ca", "--clean-all", action="store_true",
+                        help="remove all compiled objects and executables along with subdirs")
     parser.add_argument("-C", "--command", action="store_true",
                         help="remake compile_commands.json database")
     parser.add_argument("-I", "--install", action="store_true",
@@ -301,6 +383,8 @@ def run():
         run_exe()
     elif args.init:
         init_dir(args.name, args.override)
+    elif args.clean_all:
+        clean_dir(True)
     elif args.clean:
         clean_dir()
     elif args.command:
